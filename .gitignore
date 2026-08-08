@@ -8,6 +8,8 @@ env/
 # 打包产物：exe / zip 不进仓库，通过 GitHub Releases 发布
 *.exe
 *.zip
+build/
+dist/
 
 # IDE / 编辑器
 .idea/

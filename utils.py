@@ -2,6 +2,7 @@
 工具函数模块 - 平台交互、数据库查询、统计上传
 """
 import json
+import os
 import sqlite3
 import sys
 import warnings
@@ -215,14 +216,22 @@ def get_answer_by_id(question_id: str) -> tuple[tuple[str, str], ...]:
     查询不到时返回空 tuple。
     """
     db_path = f"{config.SCRIPT_DIR}/database.db"
+    if not os.path.exists(db_path):
+        print("错误：未找到题库文件 database.db，请确保它与本程序在同一目录。")
+        end(1)
+
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # 使用参数化查询防止 SQL 注入
-    cursor.execute(
-        "SELECT questionId, answer, quesType FROM tiku WHERE questionId = ? ORDER BY questionId",
-        (question_id,),
-    )
+    try:
+        cursor.execute(
+            "SELECT questionId, answer, quesType FROM tiku WHERE questionId = ? ORDER BY questionId",
+            (question_id,),
+        )
+    except sqlite3.OperationalError:
+        print("错误：题库文件 database.db 损坏（缺少 tiku 表），请重新获取脚本包。")
+        end(1)
     records = cursor.fetchall()
     conn.close()
 

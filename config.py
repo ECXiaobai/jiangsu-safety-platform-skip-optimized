@@ -31,35 +31,35 @@ BASE_URL = "http://wap.xiaoyuananquantong.com/guns-vip-main/wap"
 
 # ===== 题库映射 =====
 # 每个题库条目字段说明：
-#   articleId - 文章/课程ID
-#   title     - 课程名称
-#   question  - 题目ID(含题型后缀)
-#   quesType  - 题型: 1=单选, 2=多选, 3=判断
+#   article_id - 文章/课程ID（与 complete_unit_test 的参数一致）
+#   title      - 课程名称
+#   question   - 题目ID(含题型后缀)
+#   ques_type  - 题型: 1=单选, 2=多选, 3=判断
 
 TIKU = [
-    {"articleId": "2080135073788600321", "title": "题库学习",
-     "question": "2080136617019842561-1", "quesType": "3"},
-    {"articleId": "2079132357549375490", "title": "入学安全",
-     "question": "2079154657984266242-1", "quesType": "3"},
-    {"articleId": "2079133938168643585", "title": "国家安全",
-     "question": "2079156723934838786-B", "quesType": "1"},
-    {"articleId": "2079139032318623745", "title": "财物安全",
-     "question": "2079446660177477633-1", "quesType": "3"},
-    {"articleId": "2079140991327027201", "title": "心理健康",
-     "question": "2079467760328392705-D", "quesType": "1"},
-    {"articleId": "2079142411614830593", "title": "消防安全",
-     "question": "2079492272201678850-C", "quesType": "1"},
-    {"articleId": "2079143452481699842", "title": "人身安全",
-     "question": "2079527272678703105-1", "quesType": "3"},
-    {"articleId": "2079144978977669121", "title": "交通安全",
-     "question": "2079540470853156866-A", "quesType": "1"},
-    {"articleId": "2079146093836255234", "title": "禁毒防艾",
-     "question": "2079548501443756034-1", "quesType": "3"},
-    {"articleId": "2079146628521934850", "title": "应急救护",
+    {"article_id": "2080135073788600321", "title": "题库学习",
+     "question": "2080136617019842561-1", "ques_type": "3"},
+    {"article_id": "2079132357549375490", "title": "入学安全",
+     "question": "2079154657984266242-1", "ques_type": "3"},
+    {"article_id": "2079133938168643585", "title": "国家安全",
+     "question": "2079156723934838786-B", "ques_type": "1"},
+    {"article_id": "2079139032318623745", "title": "财物安全",
+     "question": "2079446660177477633-1", "ques_type": "3"},
+    {"article_id": "2079140991327027201", "title": "心理健康",
+     "question": "2079467760328392705-D", "ques_type": "1"},
+    {"article_id": "2079142411614830593", "title": "消防安全",
+     "question": "2079492272201678850-C", "ques_type": "1"},
+    {"article_id": "2079143452481699842", "title": "人身安全",
+     "question": "2079527272678703105-1", "ques_type": "3"},
+    {"article_id": "2079144978977669121", "title": "交通安全",
+     "question": "2079540470853156866-A", "ques_type": "1"},
+    {"article_id": "2079146093836255234", "title": "禁毒防艾",
+     "question": "2079548501443756034-1", "ques_type": "3"},
+    {"article_id": "2079146628521934850", "title": "应急救护",
      "question": "~2079553855799967746-A~2079553855799967746-B~2079553855799967746-C~2079553855799967746-D",
-     "quesType": "2"},
-    {"articleId": "2079147344531570690", "title": "防灾减灾",
-     "question": "2079558043292418049-D", "quesType": "1"},
+     "ques_type": "2"},
+    {"article_id": "2079147344531570690", "title": "防灾减灾",
+     "question": "2079558043292418049-D", "ques_type": "1"},
 ]
 
 # 请求超时（秒）
