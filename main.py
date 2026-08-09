@@ -76,12 +76,16 @@ def run_exam(user_id):
 
     # 从题库查询答案（使用列表代替元组拼接）
     answers = []
+    missing = []
     for qid in question_ids:
         result = utils.get_answer_by_id(qid)
         if not result:
-            print(f"错误：题库中未找到题目 {qid} 的答案")
-            utils.end(1)
+            print(f"警告：题库中未找到题目 {qid} 的答案，已跳过该题")
+            missing.append(qid)
+            continue
         answers.extend(result)
+    if missing:
+        print(f"注意：有 {len(missing)} 题题库缺失（已跳过），最终得分可能不理想")
 
     # 提交答案
     print("答案已生成，正在执行 imitateExam 提交答案...")
