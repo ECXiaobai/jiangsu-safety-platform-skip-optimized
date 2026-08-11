@@ -129,7 +129,7 @@ def main():
     # 计时
     elapsed_ms = (time.time() - start_time) * 1000
     print(f"执行耗时: {elapsed_ms:.3f} ms")
-    print("脚本作者: 南晓 Scwizard b站同名")
+    print("项目地址: https://github.com/ECXiaobai/jiangsu-safety-platform-skip-optimized")
 
     # 统计上报
     if config.STATS_ENABLED:
