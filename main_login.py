@@ -139,6 +139,7 @@ def main():
         except Exception:
             print("脚本统计未被上传")
 
+    print("获取更多免费脚本加Q群：1048953452")
     input("程序结束，感谢使用！")
 
 
