@@ -125,14 +125,6 @@ def main():
     print(f"执行耗时: {elapsed_ms:.3f} ms")
     print("项目地址: https://github.com/ECXiaobai/jiangsu-safety-platform-skip-optimized")
 
-    # 统计上报
-    if config.STATS_ENABLED:
-        try:
-            result = utils.upload_stats(0, round(elapsed_ms, 3))
-            print("脚本统计执行成功")
-        except Exception:
-            print("脚本统计未被上传")
-
     print("获取更多免费脚本加Q群：1048953452")
     input("程序结束，感谢使用！")
 

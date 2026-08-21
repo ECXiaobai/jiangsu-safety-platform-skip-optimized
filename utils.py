@@ -286,18 +286,3 @@ def imitate_exam(exam_id: str, log_id: str, user_id: str,
         headers=headers,
         timeout=config.REQUEST_TIMEOUT,
     )
-
-
-# ---------- 统计上传 ----------
-
-def upload_stats(score: float, runtime_ms: float) -> dict[str, Any]:
-    """
-    上传脚本使用统计（仅分数和运行时长，不含隐私信息）。
-    """
-    payload = {"score": score, "runtime_ms": runtime_ms}
-    resp = _session().post(
-        config.STATS_URL,
-        json=payload,
-        timeout=3,
-    )
-    return resp.json()

@@ -23,9 +23,6 @@ COLLEGE_ID = "1224316234189443073"
 # 考试ID
 EXAM_ID = "1948924196784492546"
 
-# 统计接口
-STATS_URL = "http://101.133.233.225:81/result_update"
-
 # 平台基础 URL
 BASE_URL = "http://wap.xiaoyuananquantong.com/guns-vip-main/wap"
 
@@ -64,6 +61,3 @@ TIKU = [
 
 # 请求超时（秒）
 REQUEST_TIMEOUT = 15
-
-# 统计功能开关
-STATS_ENABLED = True  # 设为 False 关闭统计上传
