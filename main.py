@@ -2,6 +2,8 @@ import time
 import utils
 import json
 import os
+import sys
+import shutil
 
 # “2026江苏省大学新生安全知识教育”一键完成脚本 (登录版)
 # Scwizard/HAM:BA4TLH
@@ -12,9 +14,20 @@ import os
 STATS = False # 脚本用量统计，我们只保存您的脚本最终得分和运行时长，不会记录浏览器指纹、IP地址、客户端信息等内容
 # 如果您不想开启此功能，请把 True 改成 False
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, "frozen", False):
+    # PyInstaller 打包运行：临时解压目录不可写持久，数据库必须放在 exe 旁边
+    script_dir = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 print("切换到工作目录：", os.getcwd())
+# 首次运行时把内置题库复制到 exe 旁，之后缓存（tiku_article）写入 exe 旁的数据库
+if getattr(sys, "frozen", False):
+    bundled_db = os.path.join(sys._MEIPASS, "database.db")
+    real_db = os.path.join(script_dir, "database.db")
+    if not os.path.exists(real_db) and os.path.exists(bundled_db):
+        shutil.copy(bundled_db, real_db)
+        print("已初始化数据库：", real_db)
 # 修一下目录问题
 # 2026 的时候回来发现还有一些历史遗留问题，需要解决，比如数据库的路径
 print("您正在运行：登录版 (v1.0.5)")
@@ -53,6 +66,34 @@ table = {0:tiku1, 1:tiku2, 2:tiku3, 3:tiku4, 4:tiku5, 5:tiku6, 6:tiku7, 7:tiku8,
 # 必修课每篇文章只需答对 1 道题即可通过，这里用试错法找答案。
 
 def completeCompulsory(userId, collegeId):
+    import sqlite3
+    db_path = os.path.join(script_dir, 'database.db')
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE IF NOT EXISTS tiku_article (articleId TEXT PRIMARY KEY, questionId TEXT, answer TEXT, quesType TEXT)")
+    conn.commit()
+
+    def get_cache(aid):
+        cur.execute("SELECT questionId, answer, quesType FROM tiku_article WHERE articleId=?", (aid,))
+        return cur.fetchone()
+
+    def save_cache(aid, qid, ans, qt):
+        cur.execute("INSERT OR REPLACE INTO tiku_article (articleId, questionId, answer, quesType) VALUES (?,?,?,?)", (aid, qid, ans, qt))
+        conn.commit()
+
+    def submit_unit(aid, atitle, qid, ans, qt):
+        if qt == "2":
+            qstr = "".join("~%s-%s"%(qid,c) for c in ans)
+        else:
+            qstr = "%s-%s"%(qid,ans)
+        form = [("articleId",aid),("title",atitle),("userId",userId),("ah",""),
+                ("question",qstr),("questionId",qid),("quesType",qt)]
+        rr = session.post("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/unitTest", data=form).text
+        try:
+            return json.loads(rr).get("data",{}).get("isSuccess", False)
+        except Exception:
+            return False
+
     print("正在检查必修课程完成度：")
     res = session.post("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/compulsory/list", data={"userId":userId,"collegeId":collegeId,"courseType":"1"}).text
     data = json.loads(res)
@@ -81,6 +122,24 @@ def completeCompulsory(userId, collegeId):
                     continue
                 aid = item["id"]
                 atitle = item.get("course", cname)
+                # 0) 标记文章已观看（平台 8/28 新增 markArticleViewed 校验，
+                #    正常流程先标记观看再取题，模拟真实学习避免服务器不计数）
+                try:
+                    session.get("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/markArticleViewed", params={"articleId":aid,"userId":userId})
+                except Exception:
+                    pass
+                # 1) 优先用缓存答案直接提交（1 次请求）
+                cache = get_cache(aid)
+                if cache:
+                    qid, ans, qt = cache
+                    if submit_unit(aid, atitle, qid, ans, qt):
+                        print("  [OK] %s -> %s (缓存)" % (atitle, ans))
+                        continue
+                    else:
+                        cur.execute("DELETE FROM tiku_article WHERE articleId=?", (aid,))
+                        conn.commit()
+                        print("  [--] %s 缓存失效，重新试错" % atitle)
+                # 2) 无缓存：取题 + 试错
                 rq = session.get("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/question/list", params={"articleId":aid,"ah":""}).text
                 try:
                     qlist = json.loads(rq).get("data",{}).get("list",[])
@@ -95,24 +154,23 @@ def completeCompulsory(userId, collegeId):
                     qt = q["quesType"]
                     if qt == "判断":
                         for ans in ("1","0"):
-                            rr = session.post("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/unitTest", data=[("articleId",aid),("title",atitle),("userId",userId),("ah",""),("question","%s-%s"%(qid,ans)),("questionId",qid),("quesType","3")]).text
-                            if json.loads(rr).get("data",{}).get("isSuccess"):
+                            if submit_unit(aid, atitle, qid, ans, "3"):
                                 print("  [OK] %s 判断题 %s -> %s" % (atitle,qid,ans))
+                                save_cache(aid, qid, ans, "3")
                                 ok = True
                                 break
                     elif qt == "单选":
                         for opt in "ABCD":
-                            rr = session.post("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/unitTest", data=[("articleId",aid),("title",atitle),("userId",userId),("ah",""),("question","%s-%s"%(qid,opt)),("questionId",qid),("quesType","1")]).text
-                            if json.loads(rr).get("data",{}).get("isSuccess"):
+                            if submit_unit(aid, atitle, qid, opt, "1"):
                                 print("  [OK] %s 单选题 %s -> %s" % (atitle,qid,opt))
+                                save_cache(aid, qid, opt, "1")
                                 ok = True
                                 break
                     else:
                         for combo in ("ABCD","ABC","ABD","ACD","BCD","AB","AC","AD","BC","BD","CD","A","B","C","D"):
-                            qstr = "".join("~%s-%s"%(qid,c2) for c2 in combo)
-                            rr = session.post("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/unitTest", data=[("articleId",aid),("title",atitle),("userId",userId),("ah",""),("question",qstr),("questionId",qid),("quesType","2")]).text
-                            if json.loads(rr).get("data",{}).get("isSuccess"):
+                            if submit_unit(aid, atitle, qid, combo, "2"):
                                 print("  [OK] %s 多选题 %s -> %s" % (atitle,qid,combo))
+                                save_cache(aid, qid, combo, "2")
                                 ok = True
                                 break
                     if ok:
@@ -124,6 +182,7 @@ def completeCompulsory(userId, collegeId):
     data = json.loads(res)
     for i in data["data"]:
         print("%s: %s" % (i["name"], "已完成" if i["isFinsh"] else "未完成"))
+    conn.close()
 
 res = session.post("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/compulsory/list", data={"userId":userId,"collegeId":realCollegeId}).text
 data = json.loads(res)
