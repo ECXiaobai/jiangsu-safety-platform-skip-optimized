@@ -60,7 +60,12 @@ TIKU = [
 ]
 
 # 请求超时（秒）
-REQUEST_TIMEOUT = 15
+# 参考原版：不设置超时（None = 无限等待），避免服务器响应稍慢就误判为超时
+REQUEST_TIMEOUT = None
+
+# 网络请求重试：遇到连接超时/读超时/服务器 5xx 时按指数退避自动重试，避免偶发网络抖动直接崩溃
+REQUEST_RETRIES = 3        # 最大重试次数（含首次请求）
+REQUEST_RETRY_BACKOFF = 2  # 退避基数（秒），第 n 次重试前等待 backoff ** n
 
 # 抓包/调试相关（可通过命令行 --proxy / --log 开启）
 PROXY = None        # 代理地址，例如 "http://127.0.0.1:8080"

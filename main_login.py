@@ -89,8 +89,6 @@ def run_exam(user_id):
 
     if int(score) != 100:
         print("没到100分，这是一个历史遗留问题，重刷一次就行了，因为题库录入的时候有一题出错了。")
-    else:
-        print(f"前往 {config.BASE_URL}/qrCode?userId={user_id} 下载结课证书")
 
 
 def main():

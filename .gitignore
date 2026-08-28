@@ -19,3 +19,9 @@ dist/
 # 系统文件
 Thumbs.db
 .DS_Store
+
+# 抓包文件（含账号等隐私，勿入库）
+*.har
+
+# 临时证书图片
+certificate.*

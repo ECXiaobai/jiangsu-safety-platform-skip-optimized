@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['main_login.py'],
+    ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('database.db', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

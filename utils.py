@@ -1,312 +1,325 @@
-"""
-工具函数模块 - 平台交互、数据库查询、统计上传
-"""
 import json
-import os
 import sqlite3
-import sys
-import warnings
-from typing import Any
+# import requests
+from requests import Session
+import os
 
-import requests
+# 刮风这天我试过握着你手
+# 但偏偏雨渐渐大到我看你不见
+# 还要多久我才能在你身边
+# 等到放晴的那天也许我会比较好一点
 
-import config
+# no result... 2025.08.29
 
-# 抑制 SSL 警告（verify=False 时）
-warnings.filterwarnings("ignore", category=requests.packages.urllib3.exceptions.InsecureRequestWarning)
+global session
+session = Session()
 
-# ---------- 通用 ----------
+def _safe_json_loads(text):
+    try:
+        return json.loads(text)
+    except Exception:
+        return text
 
-def end(code: int = 0) -> None:
-    """暂停并退出程序"""
-    input("按回车键退出...")
-    sys.exit(code)
-
-
-def _log_response(resp: requests.Response, *args, **kwargs) -> requests.Response:
-    """调试日志：打印每次请求的 URL、参数与响应（截断，避免刷屏）"""
-    req = resp.request
-    print(f"\n[REQ] {req.method} {req.url}")
-    body = req.body or ""
-    if body:
-        cut = len(body) > config.MAX_LOG_BODY
-        print(f"[BODY] {body[:config.MAX_LOG_BODY]}{'...[截断]' if cut else ''}")
-    text = resp.text or ""
-    cut = len(text) > config.MAX_LOG_RESP
-    print(f"[RES] {resp.status_code} {text[:config.MAX_LOG_RESP]}{'...[截断]' if cut else ''}")
-    return resp
-
-
-# 全局共享的 Session：所有请求复用同一批 cookie，保证登录后 SESSION 能带到后续接口
-_SHARED_SESSION: "requests.Session | None" = None
-
-
-def _session() -> requests.Session:
-    """返回全局共享的 Session（首次创建时配置超时、代理、日志）"""
-    global _SHARED_SESSION
-    if _SHARED_SESSION is None:
-        sess = requests.Session()
-        sess.verify = False
-        sess.timeout = config.REQUEST_TIMEOUT
-        if config.PROXY:
-            sess.proxies = {"http": config.PROXY, "https": config.PROXY}
-        if config.PRINT_LOG:
-            sess.hooks["response"] = [_log_response]
-        _SHARED_SESSION = sess
-    return _SHARED_SESSION
-
-
-# ---------- 学校查询 ----------
-
-def get_all_schools(province: str = "江苏省") -> list[dict[str, Any]]:
-    """获取指定省份的学校列表"""
-    resp = _session().get(
-        f"{config.BASE_URL}/select/proCollege",
-        params={"provincesName": province},
-        timeout=config.REQUEST_TIMEOUT,
-    )
-    return resp.json()["data"]
-
-
-def get_user_school() -> str:
+def getAllSchools(province):
     """
-    交互式获取用户所在学校的 collegeId。
-    用户输入关键词，匹配到唯一学校时直接返回；多个学校时让用户选择。
+    获取到学校列表
     """
-    school_list = get_all_schools("江苏省")
+    raw = session.get(f"http://wap.xiaoyuananquantong.com/guns-vip-main/wap/select/proCollege?provincesName={province}")
+    return raw.text
 
-    while True:
-        keyword = input("请输入学校名称[关键词也可以]：").strip()
-        if not keyword:
-            print("输入不能为空，请重新输入")
-            continue
+def getFacultyBySchoolId(id):
+    """
+    通过学校id获取到学院清单 id: int
+    """
+    raw = session.post("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/getFaculty",data={"collegeId":id,"notTeacher":10})
+    return raw.text
 
-        candidates = [s for s in school_list if keyword in s["name"]]
-        if not candidates:
-            print("未查找到任何学校，请重新输入")
-            continue
+def getClassById(id):
+    """
+    通过学院id获取到专业清单 id: int
+    """
+    raw = session.post("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/select/class",{"facultyId":id})
 
-        if len(candidates) == 1:
-            school_id = candidates[0]["id"]
-            print(f"已获取学校id：{school_id}")
-            return school_id
+def regMethod(name, collegeId, facultyId, classId, account):
+    """
+    貌似没啥用，给大佬们自己二次开发吧qwq
+    注册学生方法 通过传入姓名-name，学校id-collegeId，学院id-facultyId，专业id-classId，账号（考生号14位）-account以实现注册一个账号
+    """
+    raw = session.post("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/jsregisterUser", data={"name":name, "password":"", "collegeId":collegeId, "facultyId":facultyId, "classId":classId, "account":account})
+    """
+    接口返回示例：
+    {
+        "code":200,
+        "data":{
+            "phone":"",
+            "auth":"1b7d9a*********************ab20e",
+            "success":"\u6CE8\u518C\u6210\u529F",
+            "userId":"195**************38"
+        },
+        "message":"\u8BF7\u6C42\u6210\u529F",
+        "success":true
+    }
+    """
 
-        # 多个匹配，让用户选择
-        print("查找到以下学校：")
-        for i, s in enumerate(candidates):
-            print(f"[{i}] {s['name']}")
-
-        while True:
+def getUserSchool():
+    """
+    [+] 2026
+    通过让用户提供关键词，获取用户的 collegeId 实现登录
+    """
+    schoolKey = input("请输入学校名称[关键词也可以]：").strip()
+    try:
+        schoolList = json.loads(getAllSchools("江苏省"))
+    except:
+        print("错误：网络异常")
+        end(1)
+    schoolLs = []
+    for _ in schoolList['data']:
+        if schoolKey in _['name']:
+            schoolLs.append(_['name'])
+    if schoolLs == []:
+        print("未查找到任何学校，请重新输入")
+        getUserSchool()
+        return
+    else:
+        if len(schoolLs) == 1:
+            # 精准匹配
+            for _ in schoolList['data']:
+                if _['name'] == schoolLs[0]:
+                    print(f"已获取学校id：{_['id']}")
+                    return _['id']
+        else:
+            # 关键词序号匹配
+            print("查找到以下学校：")
+            i = 0
+            for _ in schoolLs:
+                print(f"[{i}] {_}")
+                i += 1
             try:
                 n = int(input("请输入数字序号来选择学校："))
-                if 0 <= n < len(candidates):
-                    school_id = candidates[n]["id"]
-                    print(f"已获取学校id：{school_id}")
-                    return school_id
-                print(f"序号超出范围 (0-{len(candidates) - 1})，请重新输入")
-            except ValueError:
-                print("输入有误，请输入数字")
+            except:
+                print("您的输入有误，请重新输入")
+                getUserSchool()
+                return
+            schoolName = schoolLs[n]
+            for _ in schoolList['data']:
+                    if _['name'] == schoolName:
+                        print(f"已获取学校id：{_['id']}")
+                        return _['id']
 
 
-# ---------- 登录 / 解绑 ----------
-
-def login_method(username: str, password: str, college_id: str) -> dict[str, Any]:
+def loginMethod(username, password, collegeId):
     """
-    登录函数
-    返回示例见原版注释
+    [+] 2026
+    重写的登陆函数
+    返回样例：
+        {
+        "code":200,
+        "data":{
+            "account":"******",
+            "area":"",
+            "auth":"b12f***********************653ba",
+            "avatar":"",
+            "birthday":"",
+            "classId":"*******************",
+            "className":"",
+            "collegeId":"*******************",
+            "collegeName":"",
+            "createTime":"2026-07-28 16:23:26",
+            "createUser":"*******************",
+            "deptId":"*******************",
+            "email":"",
+            "facultyId":"*******************",
+            "ipAddress":"49.**.***.46",
+            "loginNum":3,
+            "name":"****",
+            "openId":"****************************",
+            "password":"",
+            "phone":"",
+            "roleId":"*******************",
+            "salt":"9a5sr",
+            "sex":"",
+            "status":"ENABLE",
+            "sysSource":"20",
+            "updateTime":"2026-07-29 09:58:58",
+            "updateUser":-100,
+            "userId":"*******************",
+            "version":""
+        },
+        "message":"\u8BF7\u6C42\u6210\u529F",
+        "success":true
+    }
     """
+    cookies = {}
+
     headers = {
-        "Accept": "application/json, text/javascript, */*; q=0.01",
-        "Accept-Language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Connection": "keep-alive",
-        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-        "Origin": "http://wap.xiaoyuananquantong.com",
-        "Referer": "http://wap.xiaoyuananquantong.com/guns-vip-main/wap/jiangsuwxJsback",
-        "User-Agent": (
-            "Mozilla/5.0 (Linux; Android 16; MEIZU 20 Pro Build/BQ2A.251110.001-"
-            "BP2A.250605.031.A3; wv) AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Version/4.0 Chrome/146.0.7680.178 Mobile Safari/537.36 XWEB/1460249 "
-            "MMWEBSDK/20260202 MMWEBID/3950 REV/6666666666666666666666666666666666666666 "
-            "MicroMessenger/8.0.71.3080(0x28004750) WeChat/arm64 Weixin NetType/5G "
-            "Language/zh_CN ABI/arm64"
-        ),
-        "X-Requested-With": "XMLHttpRequest",
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Connection': 'keep-alive',
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        'Origin': 'http://wap.xiaoyuananquantong.com',
+        'Referer': 'http://wap.xiaoyuananquantong.com/guns-vip-main/wap/jiangsuwxJsback',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 16; MEIZU 20 Pro Build/BQ2A.251110.001-BP2A.250605.031.A3; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/146.0.7680.178 Mobile Safari/537.36 XWEB/1460249 MMWEBSDK/20260202 MMWEBID/3950 REV/6666666666666666666666666666666666666666 MicroMessenger/8.0.71.3080(0x28004750) WeChat/arm64 Weixin NetType/5G Language/zh_CN ABI/arm64',
+        'X-Requested-With': 'XMLHttpRequest',
     }
+
     data = {
-        "openId": "",
-        "account": username,
-        "collegeId": college_id,
-        "password": password,
+        'openId': '',
+        'account': f'{username}',
+        'collegeId': f'{collegeId}',
+        'password': f'{password}',
     }
-    resp = _session().post(
-        f"{config.BASE_URL}/jsUserLogin",
+
+    response = session.post(
+        'http://wap.xiaoyuananquantong.com/guns-vip-main/wap/jsUserLogin',
+        cookies=cookies,
         headers=headers,
         data=data,
-        timeout=config.REQUEST_TIMEOUT,
+        verify=False,
     )
-    return resp.json()
+    return json.loads(response.text)
 
+def UntyingMethod(userid):
+    """
+    微信解绑，没有鉴权，真搞不明白他设置那个ah的作用是啥
+    """
+    cookies = {}
 
-def untying_method(user_id: str) -> dict[str, Any]:
-    """微信解绑"""
     headers = {
-        "Accept": "application/json, text/javascript, */*; q=0.01",
-        "Accept-Language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Connection": "keep-alive",
-        "Referer": "http://wap.xiaoyuananquantong.com/guns-vip-main/wap/jspersonal",
-        "User-Agent": (
-            "Mozilla/5.0 (Linux; Android 16; MEIZU 20 Pro Build/BQ2A.251110.001-"
-            "BP2A.250605.031.A3; wv) AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Version/4.0 Chrome/146.0.7680.178 Mobile Safari/537.36 XWEB/1460249 "
-            "MMWEBSDK/20260202 MMWEBID/3950 REV/6666666666666666666666666666666666666666 "
-            "MicroMessenger/8.0.71.3080(0x28004750) WeChat/arm64 Weixin NetType/5G "
-            "Language/zh_CN ABI/arm64"
-        ),
-        "X-Requested-With": "XMLHttpRequest",
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Connection': 'keep-alive',
+        'Referer': 'http://wap.xiaoyuananquantong.com/guns-vip-main/wap/jspersonal',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 16; MEIZU 20 Pro Build/BQ2A.251110.001-BP2A.250605.031.A3; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/146.0.7680.178 Mobile Safari/537.36 XWEB/1460249 MMWEBSDK/20260202 MMWEBID/3950 REV/6666666666666666666666666666666666666666 MicroMessenger/8.0.71.3080(0x28004750) WeChat/arm64 Weixin NetType/5G Language/zh_CN ABI/arm64',
+        'X-Requested-With': 'XMLHttpRequest',
     }
-    params = {"userId": user_id}
-    resp = _session().get(
-        f"{config.BASE_URL}/JsUntying",
+
+    params = {
+        'userId': f'{userid}',
+    }
+
+    response = session.get(
+        'http://wap.xiaoyuananquantong.com/guns-vip-main/wap/JsUntying',
         params=params,
+        cookies=cookies,
         headers=headers,
-        timeout=config.REQUEST_TIMEOUT,
+        verify=False,
     )
-    return resp.json()
+    return json.loads(response.text)
 
 
-# ---------- 课程与考试 ----------
-
-def get_course_list(user_id: str) -> list[dict[str, Any]]:
-    """获取课程列表及完成状态"""
-    resp = _session().post(
-        f"{config.BASE_URL}/compulsory/list",
-        data={"userId": user_id, "collegeId": config.COLLEGE_ID},
-        timeout=config.REQUEST_TIMEOUT,
-    )
-    return resp.json()["data"]
-
-
-def complete_unit_test(user_id: str, article_id: str, title: str,
-                       question: str, ques_type: str) -> None:
-    """完成一个单元的测试"""
-    data = {
-        "articleId": article_id,
-        "title": title,
-        "userId": user_id,
-        "ah": "",
-        "question": question,
-        "quesType": ques_type,
-    }
-    _session().post(
-        f"{config.BASE_URL}/unitTest",
-        data=data,
-        timeout=config.REQUEST_TIMEOUT,
-    )
-
-
-def create_exam(user_id: str) -> dict[str, Any]:
-    """创建考试"""
-    resp = _session().post(
-        f"{config.BASE_URL}/test/create",
-        data={"examId": config.EXAM_ID, "userId": user_id},
-        timeout=config.REQUEST_TIMEOUT,
-    )
-    return resp.json()
-
-
-def get_exam(log_id: str, user_id: str) -> dict[str, Any]:
-    """获取考题列表"""
-    url = f"{config.BASE_URL}/test/list?logId={log_id}&page=1&limit=200&ah=&userId={user_id}"
-    resp = _session().get(url, timeout=config.REQUEST_TIMEOUT)
-    return resp.json()
-
-
-def get_exam_id(user_id: str) -> dict[str, Any]:
-    """获取考试 ID"""
-    resp = _session().post(
-        f"{config.BASE_URL}/test/getTest",
-        data={"examType": 2, "examClass": 20, "userId": user_id, "ah": ""},
-        timeout=config.REQUEST_TIMEOUT,
-    )
-    return resp.json()
-
-
-# ---------- 数据库（题库） ----------
-
-def get_answer_by_id(question_id: str) -> tuple[tuple[str, str], ...]:
+def processData():
     """
-    从 SQLite 题库查询答案，返回适用于 requests POST 的 tuple 片段。
-
-    返回格式：(("question", ...), ("questionId", ...), ("quesType", ...))
-    查询不到时返回空 tuple。
+    自用函数，现在没啥用了
+    处理请求数据 -> 提交答案的请求，将其转为json类型
     """
-    db_path = f"{config.SCRIPT_DIR}/database.db"
-    if not os.path.exists(db_path):
-        print("错误：未找到题库文件 database.db，请确保它与本程序在同一目录。")
-        end(1)
+    with open("sample.txt", 'r', encoding='utf-8') as f:
+        lines = [line.strip() for line in f.readlines() if line.strip()]
+        f.close()
+    
+    with open("out.txt", "w", encoding="utf-8") as f:
+        nowLine = 0
+        f.write('{"')
+        for i in lines:
+            if nowLine % 2 == 0:
+                print(nowLine)
+                # 判断结果是个整数，来确定奇偶，这是个偶数的话那就是key，奇数就是value
+                f.write(i+'":"')
+                nowLine += 1
+            else:
+                print(nowLine)
+                f.write(i+'","')
+                nowLine += 1
+        f.write('"}')
+        f.close()
+    
+def creatExam(userId):
+    # 创建考试方法
+    result = session.post("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/test/create",data={"examId":"1948924196784492546","userId":userId}).text
+    return _safe_json_loads(result)
 
-    conn = sqlite3.connect(db_path)
+def getExam(logId,userId):
+    # 获取考题
+    result = session.get("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/test/list?logId=%s&page=1&limit=200&ah=&userId=%s" % (logId,userId)).text
+    return _safe_json_loads(result)
+
+def getAnswerById(id):
+    # print(f"查询 {id}")
+    # 从数据库获取答案然后组装元组
+    conn = sqlite3.connect(os.path.abspath('database.db')) # 2026 修复路径问题，解决找不到tiku的报错
     cursor = conn.cursor()
-
-    # 使用参数化查询防止 SQL 注入
-    try:
-        cursor.execute(
-            "SELECT questionId, answer, quesType FROM tiku WHERE questionId = ? ORDER BY questionId",
-            (question_id,),
-        )
-    except sqlite3.OperationalError:
-        print("错误：题库文件 database.db 损坏（缺少 tiku 表），请重新获取脚本包。")
-        end(1)
+    
+    cursor.execute(f'''
+    SELECT questionId, answer, quesType 
+    FROM tiku 
+    WHERE questionId is %s
+    ORDER BY questionId
+    '''% id)
+    
     records = cursor.fetchall()
     conn.close()
-
+    
+    # 没有对应答案
     if not records:
-        print(f"题库中未找到题目 {question_id}")
-        return ()
-
-    row = records[0]
-    qid, answer, qtype = row
-
-    if qtype == "2":
-        # 多选题：拼接多选项
-        parts = [f"~{r[0]}-{r[1]}" for r in records]
-        question = "".join(parts)
+        print("没找到答案")
+        return ""
+    print(f"从题库查询题目 {id} 类型 {records[0][2]} -> 答案 {records[0][1]}")
+    
+    quesType = records[0][2]
+    if quesType == "2":
+        # 多选
+        question = ""
+        for i in records:
+            question += "~%s-%s" % (i[0],i[1])
+    elif quesType == "1":
+        # 单选
+        question = "%s-%s" % (records[0][0],records[0][1])
     else:
-        # 单选 / 判断
-        question = f"{qid}-{answer}"
+        # 判断
+        question = "%s-%s" % (records[0][0],records[0][1])
+    # 重建原始字符串
+    return ("question",question),("questionId",records[0][0]),("quesType",quesType)
+    # 保留了另一种构建完整请求体的方法 ↓↓↓
+    # return "&question=%s&questionId=%s&quesTpe=%s"%(question,records[0][0],quesType)
 
-    return (
-        ("question", question),
-        ("questionId", qid),
-        ("quesType", qtype),
-    )
+def getExamId(userId):
+    res = session.post("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/test/getTest",data={"examType":2,"examClass":20,"userId":userId,"ah":""})
+    return _safe_json_loads(res.text)
 
-
-# ---------- 提交答案 ----------
-
-def imitate_exam(exam_id: str, log_id: str, user_id: str,
-                 answers: list[tuple[str, str]]) -> requests.Response:
-    """提交考试答案"""
+def imitateExam(examId,logId,userId,answers):
     headers = {
         "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-        "Referer": (
-            f"{config.BASE_URL}/newStudentssimulate"
-            f"?examId={exam_id}&examType=2&userId={user_id}&ah"
-        ),
-    }
+        "Referer" : "http://wap.xiaoyuananquantong.com/guns-vip-main/wap/newStudentssimulate?examId=%s&examType=2&userId=%s&ah"% (examId, userId)
+        }
     data = [
-        ("examId", exam_id),
-        ("examType", "2"),
-        ("sysSource", "20"),
-        ("logId", log_id),
-        ("userId", user_id),
-        ("ah", ""),
-    ]
-    data.extend(answers)
+        ("examId",examId),
+        ("examType",2),
+        ("sysSource",20),
+        ("logId",logId),
+        ("userId",userId),
+        ("ah",""),
+        ]
+    data += answers
+    # 构造提交考试请求：examId=1948924196784492546&examType=2&sysSource=20&logId=1956159499542806530&userId=1955967136757313538&ah=
+    result = session.post("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/imitateTest", data=data, headers=headers)
+    return result
 
-    return _session().post(
-        f"{config.BASE_URL}/imitateTest",
-        data=data,
-        headers=headers,
-        timeout=config.REQUEST_TIMEOUT,
-    )
+def end(code: int):
+    input()
+    exit(code)
+
+def upload_stats(score, execute_time):
+    """
+    脚本用量统计，我们只保存您的脚本最终得分和运行时长，不会记录浏览器指纹、IP地址、客户端信息等内容
+    如果您不想开启此功能，请在 main.py 的开始位置把 STATS = True 改成 STATS = False
+    """
+    url = "http://101.133.233.225:81/result_update"
+
+    payload = {
+        "score": score,
+        "runtime_ms": execute_time
+    }
+
+    resp = session.post(url, json=payload, timeout=3)
+    return resp.json()
+    # Example return: 
+    # {'status': 'ok', 'message': '记录成功', 'data': {'count': 1, 'score': 100.0, 'runtime_ms': 2369.517}}
