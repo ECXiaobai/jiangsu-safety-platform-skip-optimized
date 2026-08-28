@@ -3,6 +3,7 @@
 Scwizard/HAM:BA4TLH
 2025/08/14 (Rebuild at 2026/07/25, Optimized 2026/07/29)
 """
+import argparse
 import json
 import os
 import time
@@ -80,7 +81,7 @@ def run_exam(user_id):
         answers.extend(result)
 
     # 提交答案
-    print("答案已生成，正在执行 imitateExam 提交答案...")
+    print(f"答案已生成（{len(answers)} 题），正在执行 imitateExam 提交答案...")
     resp = utils.imitate_exam(exam_id, log_id, user_id, answers)
     result = resp.json()
     score = result["data"]["count"]
@@ -93,6 +94,14 @@ def run_exam(user_id):
 
 
 def main():
+    # 解析命令行参数（--proxy / --log）
+    parser = argparse.ArgumentParser(description="江苏省安全教育平台一键完成脚本 - 登录版")
+    parser.add_argument("--proxy", help="HTTP/HTTPS 代理地址，例如 http://127.0.0.1:8080")
+    parser.add_argument("--log", action="store_true", help="打印每次请求与响应，方便抓包调试")
+    args = parser.parse_args()
+    config.PROXY = args.proxy
+    config.PRINT_LOG = args.log
+
     # 切换到脚本所在目录
     os.chdir(config.SCRIPT_DIR)
     print(f"切换到工作目录：{os.getcwd()}")
@@ -121,10 +130,10 @@ def main():
     # 执行考试
     run_exam(user_id)
 
-    # 解绑并退出登录
-    print("正在解绑openId并退出登录...")
+    # 解绑并退出登录（成功时静默，失败才提示）
     unbind_result = utils.untying_method(user_id)
-    print(unbind_result)
+    if not unbind_result.get("success"):
+        print(f"解绑失败：{unbind_result.get('message', unbind_result)}")
 
     # 计时
     elapsed_ms = (time.time() - start_time) * 1000

@@ -23,12 +23,37 @@ def end(code: int = 0) -> None:
     sys.exit(code)
 
 
+def _log_response(resp: requests.Response, *args, **kwargs) -> requests.Response:
+    """调试日志：打印每次请求的 URL、参数与响应（截断，避免刷屏）"""
+    req = resp.request
+    print(f"\n[REQ] {req.method} {req.url}")
+    body = req.body or ""
+    if body:
+        cut = len(body) > config.MAX_LOG_BODY
+        print(f"[BODY] {body[:config.MAX_LOG_BODY]}{'...[截断]' if cut else ''}")
+    text = resp.text or ""
+    cut = len(text) > config.MAX_LOG_RESP
+    print(f"[RES] {resp.status_code} {text[:config.MAX_LOG_RESP]}{'...[截断]' if cut else ''}")
+    return resp
+
+
+# 全局共享的 Session：所有请求复用同一批 cookie，保证登录后 SESSION 能带到后续接口
+_SHARED_SESSION: "requests.Session | None" = None
+
+
 def _session() -> requests.Session:
-    """创建一个带默认超时和通用头的 Session"""
-    sess = requests.Session()
-    sess.verify = False
-    sess.timeout = config.REQUEST_TIMEOUT
-    return sess
+    """返回全局共享的 Session（首次创建时配置超时、代理、日志）"""
+    global _SHARED_SESSION
+    if _SHARED_SESSION is None:
+        sess = requests.Session()
+        sess.verify = False
+        sess.timeout = config.REQUEST_TIMEOUT
+        if config.PROXY:
+            sess.proxies = {"http": config.PROXY, "https": config.PROXY}
+        if config.PRINT_LOG:
+            sess.hooks["response"] = [_log_response]
+        _SHARED_SESSION = sess
+    return _SHARED_SESSION
 
 
 # ---------- 学校查询 ----------
@@ -241,7 +266,6 @@ def get_answer_by_id(question_id: str) -> tuple[tuple[str, str], ...]:
 
     row = records[0]
     qid, answer, qtype = row
-    print(f"从题库查询题目 {qid} 类型 {qtype} -> 答案 {answer}")
 
     if qtype == "2":
         # 多选题：拼接多选项

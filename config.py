@@ -61,3 +61,9 @@ TIKU = [
 
 # 请求超时（秒）
 REQUEST_TIMEOUT = 15
+
+# 抓包/调试相关（可通过命令行 --proxy / --log 开启）
+PROXY = None        # 代理地址，例如 "http://127.0.0.1:8080"
+PRINT_LOG = False   # 打印每次请求与响应，方便抓包调试
+MAX_LOG_BODY = 120  # --log 模式下打印请求体的最大字符数
+MAX_LOG_RESP = 200  # --log 模式下打印响应的最大字符数
