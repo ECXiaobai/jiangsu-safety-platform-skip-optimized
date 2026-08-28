@@ -14,12 +14,6 @@ import os
 global session
 session = Session()
 
-def _safe_json_loads(text):
-    try:
-        return json.loads(text)
-    except Exception:
-        return text
-
 def getAllSchools(province):
     """
     获取到学校列表
@@ -235,12 +229,12 @@ def processData():
 def creatExam(userId):
     # 创建考试方法
     result = session.post("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/test/create",data={"examId":"1948924196784492546","userId":userId}).text
-    return _safe_json_loads(result)
+    return json.loads(result)
 
 def getExam(logId,userId):
     # 获取考题
     result = session.get("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/test/list?logId=%s&page=1&limit=200&ah=&userId=%s" % (logId,userId)).text
-    return _safe_json_loads(result)
+    return json.loads(result)
 
 def getAnswerById(id):
     # print(f"查询 {id}")
@@ -283,7 +277,8 @@ def getAnswerById(id):
 
 def getExamId(userId):
     res = session.post("http://wap.xiaoyuananquantong.com/guns-vip-main/wap/test/getTest",data={"examType":2,"examClass":20,"userId":userId,"ah":""})
-    return _safe_json_loads(res.text)
+    jsonData = json.loads(res.text)
+    return jsonData
 
 def imitateExam(examId,logId,userId,answers):
     headers = {

@@ -1,36 +1,29 @@
-# 江苏省安全教育平台一键完成脚本（2026 优化版）
+# ”2026江苏省大学新生安全知识教育“一键完成脚本
 
-"2026江苏省大学新生安全知识教育" 一键完成脚本（重构优化版）。
+jiangsu-safety-platform-skip
 
-> 本项目是基于 [Scwizard/jiangsu-safety-platform-skip](https://github.com/Scwizard/jiangsu-safety-platform-skip)
-> （Apache License 2.0）重构优化的衍生版本，原作者为南京晓庄学院 Scwizard，感谢原作者的分享。
+**🤔 食用指导**
 
-## 功能
+1.安装 Python3 ，并且确保安装了这个额外的库： requests 。
 
-- **登录版**（`main_login.py`）：输入学校名称、账号、密码即可，支持：
-  - 关键词自动匹配学校（唯一匹配直接选中，多个匹配可交互选择）；
-  - 完成后自动解绑 openId 并退出登录。
+2.程序只要登录版，对应仓库内的 main.py ，登陆版需要输入学校名称、账号和密码。
 
-## 与原版的区别（优化点）
+3.安全教育平台于 2026 年 8 月 28 日新增 Cookie 认证，由于需要登录取得 Cookie ，目前已移除 userid 版本。
 
-- 代码模块化重构：`config.py`（配置与题库）、`utils.py`（平台交互）与入口脚本分离；
-- 题库查询改用 SQL 参数化查询，避免 SQL 注入；
-- 统一使用 `requests.Session`，集中管理超时与请求头；
-- 适配 2026 年平台接口与题库；
-- 不再向原作者服务器上报任何统计信息。
+⚙ **基本原理**
 
-## 使用方法
+通过数据包重放的方式完成课程学习，通过将考题对应答案写入 database.db 中来实现答案获取和处理。
 
-1. 安装 Python 3，并安装依赖：`pip install -r requirements.txt`（仅需 `requests`）；
-2. 运行 `python main_login.py`；
-3. 按程序提示输入即可，运行完成后可在平台主页"结课"中查询证书。
+✒️ **进阶**
 
-## 免责声明
+欢迎提交 Issue 来交换您的看法和对脚本的更多建议！
 
-- 本脚本仅供学习交流使用，**禁止用于盈利**；
-- 使用本脚本可能违反学校或平台的相关规定，请自行评估风险，后果自负；
-- 脚本使用过程中产生的账号风险与作者无关。
+——南京晓庄学院 Scwizard
 
-## License
+👌 **给我捐点**
 
-[Apache License 2.0](LICENSE)
+![donation](https://raw.githubusercontent.com/Scwizard/jiangsu-safety-competition/refs/heads/main/donation.jpg)
+
+📊 **统计数据**
+
+![stats](http://101.133.233.225:81/chart?no-cache=true)
