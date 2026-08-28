@@ -11,16 +11,14 @@
   3. creatExam 写死旧 examId -> 改为通过 getTest(examType=2, examClass=20) 动态获取,并正确携带 ah 参数。
   4. 修复:创建考试返回 code=500 时 TypeError 崩溃 -> 改为友好提示服务器返回的 message。
   5. 修复:答案缺失时 answers += "" 的 TypeError 被误报为“数据库读写错误” -> 明确提示缺哪题。
-  6. 移除结尾的微信解绑(UntyingMethod 会解绑 openId,可能导致后续无法用微信登录)。
+  6. 考试完成后静默解绑 openId(JsUntying,不打印);满分时打印证书网址(不下载)。
   7. 学校选择:修复递归不 return 返回 None、序号越界崩溃的问题。
   8. 全部 SQL 改参数化查询;所有接口响应先校验 code 再取字段,避免裸崩溃。
 """
 import os
 import sys
-import re
 import json
 import time
-import base64
 import sqlite3
 import urllib3
 
@@ -38,7 +36,7 @@ except Exception:
     pass
 
 BASE = "http://wap.xiaoyuananquantong.com/guns-vip-main/wap"
-STATS = True  # 脚本用量统计(只上传分数和用时),不需要请改为 False
+STATS = False  # 脚本用量统计(只上传分数和用时),我们只保存您的脚本最终得分和运行时长,不需要请改为 True
 HEADERS = {
     "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
     "Origin": "http://wap.xiaoyuananquantong.com",
@@ -229,10 +227,12 @@ def complete_all_courses(user_id, college_id):
             d = session.post(f"{BASE}/directory/list",
                              data={"name": "", "courseId": cid, "userId": user_id,
                                    "collegeId": college_id, "ah": ""}, timeout=25).json()
-            articles = [it["id"] for ch in (d.get("data") or []) for it in (ch.get("list") or [])]
-            for art in articles:
-                if not complete_article(user_id, name, art, cache):
-                    all_ok = False
+            for ch in (d.get("data") or []):
+                for it in (ch.get("list") or []):
+                    if it.get("isFinsh"):
+                        continue  # 文章已完成,跳过(效率优化:已完成的不再重复提交)
+                    if not complete_article(user_id, name, it["id"], cache):
+                        all_ok = False
             time.sleep(0.3)
     save_course_answers(cache)
     return all_ok
@@ -304,23 +304,16 @@ def take_exam(user_id):
     return None
 
 
-def download_certificate(user_id):
+def silent_untie(user_id):
+    """静默解绑 openId(不打印),避免平台重复推送"""
     try:
-        r = session.get(f"{BASE}/qrCode?userId={user_id}", timeout=25)
-        m = re.search(r"data:image/(\w+);base64,([A-Za-z0-9+/=]+)", r.text)
-        if m:
-            name = os.path.join(script_dir, f"certificate.{m.group(1)}")
-            with open(name, "wb") as f:
-                f.write(base64.b64decode(m.group(2)))
-            print(f"证书图片已保存到: {name}")
-            return name
-    except Exception as e:
-        print(f"证书下载失败: {e}")
-    return None
+        session.get(f"{BASE}/JsUntying", params={"userId": user_id}, timeout=25, verify=False)
+    except Exception:
+        pass
 
 
 def main():
-    print("您正在运行:登录版 2026-08-28 修复版")
+    print("您正在运行:登录版 (2026 增强版)")
 
     # 学校选择(带重试与越界保护)
     college_id = None
@@ -376,14 +369,18 @@ def main():
     print("课程学习完成,进入考试流程...")
     score = take_exam(user_id)
     if score is not None:
-        print(f"前往 {BASE}/qrCode?userId={user_id} 查看结课证书")
-        download_certificate(user_id)
+        if int(score) != 100:
+            print("没到100分，这是一个历史遗留问题，重刷一次就行了，因为题库录入的时候有一题出错了。")
+        else:
+            print(f"前往 {BASE}/qrCode?userId={user_id} 下载结课证书")
     else:
         print("考试未通过(≥90 分才算通过),请检查后重新运行。")
+    silent_untie(user_id)  # 静默解绑 openId,不打印
 
     elapsed_ms = (time.time() - start_time) * 1000
     print(f"execute time: {elapsed_ms:.3f} ms.")
-    print("原脚本作者:南晓 Scwizard | 由Mr_Zhen_(狐涂)修正")
+    print("开源地址：https://github.com/ECXiaobai/jiangsu-safety-platform-skip-optimized")
+    print("获取更多免费脚本加Q群：1048953452")
     if STATS:
         try:
             session.post("http://101.133.233.225:81/result_update",
